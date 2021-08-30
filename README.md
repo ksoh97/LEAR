@@ -50,4 +50,4 @@ enc_weight_path = Pre-trained encoder weight path trained in mode#0 setup\
 cmg_weight_path = Pre-trained counterfactual map generator weight path trained in mode#1 setup\
 xga_cls_weight_path = Pre-trained XGA-injected diagnostic model weight path trained in mode#2 or mode#4 setup\
 xga_enc_weight_path = Pre-trained XGA-injected encoder weight path trained in mode#2 or mode#4 setup
-cmg_weight_path = Pre-trained XGA-injected counterfactual map generator weight path trained in mode#3 setup\
+xga_cmg_weight_path = Pre-trained XGA-injected counterfactual map generator weight path trained in mode#3 setup\
