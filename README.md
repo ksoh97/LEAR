@@ -36,7 +36,7 @@ Mode:\
 >- Change the mode to 2 on Config.py
   >- `training.py --mode=2`
 
-4. Ierative explanation-reinforcement learning
+4. Iterative explanation-reinforcement learning
 >- Enhances the quality of visual explanation as well as the performance of the diagnostic model
 >- Change the mode to 3 or 4 on Config.py
   >- `training.py --mode=3 and --mode=4`
