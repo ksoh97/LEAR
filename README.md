@@ -48,4 +48,5 @@ save_path = Storage path to save results such as tensorboard event files, model 
 cls_weight_path = Pre-trained diagnostic model weight path trained in mode#0 setup\
 enc_weight_path = Pre-trained encoder weight path trained in mode#0 setup\
 cmg_weight_path = Pre-trained counterfactual map generator weight path trained in mode#1 setup\
-xga_cls_weight_path = Pre-trained XGA-injected diagnostic model weight path trained in mode#2 setup
+xga_cls_weight_path = Pre-trained XGA-injected diagnostic model weight path trained in mode#2 setup\
+xga_enc_weight_path = Pre-trained XGA-injected encoder weight path trained in mode#2 setup
