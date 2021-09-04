@@ -2,8 +2,13 @@ import tensorflow.keras as keras
 import tensorflow as tf
 tf.random.Generator = None
 import tensorflow_addons as tfa
+import LEAR_config as config
+
 l = tf.keras.layers
-W, H, D, c = 96, 114, 96, 3
+W, H, D, c = 96, 114, 96, config.classes
+
+def input_layer(input_shape=(W, H, D, 1), name=None):
+    return l.Input(shape=input_shape)
 
 def resc1(input_shape=(48, 57, 48, c), name=None):
     return l.Input(shape=input_shape)
