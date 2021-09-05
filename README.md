@@ -24,22 +24,22 @@ Mode:\
 
 1. Learn: pre-training a diagnostic model
 >- Diagnosic models are a CNN-based architecure (ResNet18, VoxCNN, and SonoNet16)
-  >- `training.py --mode=0`
+  >- `LEAR_training.py --mode=0`
 
 2. Explain: Counterfactual map generation using a pre-trained diagnostic model
 >- Set the classifier and encoder weight for training (freeze)
 >- Change the mode from 0 to 1 on Config.py
-  >- `training.py --mode=1`
+  >- `LEAR_training.py --mode=1`
 
 3. Reinforce: Explanation-guided attention to improve its generalizabiliy and performance
 >- Set the counterfactual map generator (CMG) weight for training an explanation-guided attention (XGA) module injected into a diagnostic model
 >- Change the mode to 2 on Config.py
-  >- `training.py --mode=2`
+  >- `LEAR_training.py --mode=2`
 
 4. Iterative explanation-reinforcement learning
 >- Enhances the quality of visual explanation as well as the performance of the diagnostic model
 >- Change the mode to 3 or 4 on Config.py
-  >- `training.py --mode=3 and --mode=4`
+  >- `LEAR_iterative_training.py --mode=3 and --mode=4`
 
 
 ### Config.py of each dataset with saved weight path
