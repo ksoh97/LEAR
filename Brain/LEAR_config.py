@@ -11,9 +11,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = devices
 mode_dict = {"Learn": 0, "Explain": 1, "Reinforce": 2, "Iter_Explanation": 3, "Iter_reinforcement": 4}
 mode = "Learn"
 
-# data_path = "/..."
-# longitudinal_data_path = "/..."
-# save_path = "/..."
+data_path = "/..."
+longitudinal_data_path = "/..."
+save_path = "/..."
 
 file_name = mode
 save_path = save_path + "/%s" % mode
