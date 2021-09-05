@@ -2,7 +2,6 @@ import os
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-import pickle
 import LEAR_config as config
 import LEAR_networks as network
 import LEAR_losses as loss
@@ -27,92 +26,76 @@ class Trainer:
         if not os.path.exists(self.path): os.makedirs(self.path)
 
     def build_model(self):
-        if config.mode == "Learn":
-            resnet = network.ResNet18()
-            self.train_vars = []
-            self.cls_model = resnet.build_model()
-            self.train_vars += self.cls_model.trainable_variables
+        if config.mode == "Iter_Explanation":
+            xga_generator, discriminator = network.ResNet18_XGA_Generator(), network.ResNet18_Discriminator()
+            xga_resnet = network.ResNet18_XGA()
+            generator = network.ResNet18_Generator()
 
-        elif config.mode == "Explain":
-            generator, discriminator = network.ResNet18_Generator(), network.ResNet18_Discriminator()
             self.train_discri_vars = []
+            self.discriminator_model = discriminator.build_model()
+            self.train_discri_vars += self.discriminator_model.trainable_variables
 
-            self.discri_model = discriminator.build_model()
-            self.train_discri_vars += self.discri_model.trainable_variables
-            self.gen_model = generator.build_model()
-
-            resnet = network.ResNet18()
             self.train_vars = []
-            self.cls_model = resnet.build_model()
+            self.enc_model, self.cls_model = xga_resnet.build_model()
+            self.xga_gen_model = xga_generator.build_model()
+            self.gen_model = generator.build_model()
+            self.cls_model.load_weights(config.xga_cls_weight_path), self.gen_model.load_weights(config.gen_weight_path)
 
-            cls_load_weights = config.cls_weight_path
-            self.cls_model.load_weights(cls_load_weights)
-            for layer in self.cls_model.layers: layer.trainable = False
-
-            for enc_layer, gen_layer in zip(self.cls_model.layers[:-3], self.gen_model.layers):
+            # Encoder part initialization and freeze
+            self.cls_model.trainable = False
+            for enc_layer, gen_layer in zip(self.enc_model.layers, self.xga_gen_model.layers):
                 gen_layer.set_weights(enc_layer.get_weights())
-                gen_layer.trainable = False
+                gen_layer.trainable, enc_layer.trainable = False, False
 
-            save_variables = False
-            for variables in self.gen_model.trainable_variables:
-                if "dec" in variables.name: save_variables = True
-                if save_variables: self.train_vars += [variables]
+            # Decoder part initialization
+            freeze_gen_num, freeze_xga_gen_num = 0, 0
+            for cnt, dec_layer in enumerate(self.gen_model.layers):
+                if dec_layer.name == "dec_code_conv5_1_conv": freeze_gen_num = cnt
+            for cnt, gen_layer in enumerate(self.xga_gen_model.layers):
+                if gen_layer.name == "dec_code_conv5_1_conv": freeze_xga_gen_num = cnt
+            for b_dec_layer, gen_layer in zip(self.gen_model.layers[freeze_gen_num:], self.xga_gen_model.layers[freeze_xga_gen_num:]):
+                gen_layer.set_weights(b_dec_layer.get_weights())
 
-        elif config.mode == "Reinforce":
+            for variables in self.xga_gen_model.trainable_variables:
+                self.train_vars += [variables]
+
+        elif config.mode == "Iter_reinforcement":
+            resnet = network.ResNet18()
             xga_resnet = network.ResNet18_XGA()
             self.train_vars = []
-            _, self.cls_model = xga_resnet.build_model()
+            _, self.cls_model =xga_resnet.build_model()
+            self.old_cls_model = resnet.build_model()
 
-            dict = {"77": 21, "78": 23, "79": 24, "80": 25, "81": 26, "82": 28, "83": 29, "84": 30, "85": 31, "86": 33,
-                    "87": 34, "88": 35, "89": 36, "90": 38, "91": 39, "92": 40, "93": 41}
+            self.cls_model.load_weights(config.xga_cls_weight_path)
 
-            with open(config.cls_weight_pkl_path, "rb") as f:
-                weight_dict = pickle.load(f)
-
-            new_weight_dict = {}
-            for fff in weight_dict:
-                old_f = fff
-                if fff[0] == "b":
-                    fff = "batch_normalization_%d/%s" % (dict["%d" % int(fff.split("_")[2].split("/")[0])], fff.split("/")[-1])
-                elif fff[0] == "d":
-                    fff = "dense_%d/%s" % (17, fff.split("/")[-1])
-                new_weight_dict[fff] = weight_dict[old_f]
-
-            for l in self.cls_model.layers:
-                for old_w in l.weights:
-                    for dict in new_weight_dict:
-                        if old_w.name == dict:
-                            keras.backend.set_value(old_w, new_weight_dict[old_w.name])
-
-            injection = True
-            for variables in self.cls_model.trainable_variables:
-                for dict in new_weight_dict:
-                    if variables.name == dict: injection = False
-                if injection: self.train_vars += [variables]
-                injection = True
+            for old_l in self.old_cls_model.layers:
+                for old_w in old_l.weights:
+                    for l in self.cls_model.layers:
+                        for w in l.weights:
+                            if old_w.name == w.name:
+                                l.trainable = False
+            self.train_vars += self.cls_model.trainable_variables
 
             # TODO: Counterfactual map generator setting
-            map_generator = network.ResNet18_Generator()
+            map_generator = network.ResNet18_XGA_Generator()
             self.map_generator = map_generator.build_model()
-            self.map_generator.load_weights(config.gen_weight_path)
+            self.map_generator.load_weights(config.xga_gen_weight_path)
             for layer in self.map_generator.layers: layer.trainable = False
 
     def _train_one_batch(self, dat_all, lbl, gen_optim, train_vars, step, cv, c_nc, c_ad):
+        nc_c1, nc_c2, nc_c3, nc_c4, nc_c5 = utils.Utils().codemap(c_nc)
+        ad_c1, ad_c2, ad_c3, ad_c4, ad_c5 = utils.Utils().codemap(c_ad)
+        nc_map1, nc_map2 = utils.Utils().map_interpolation(dat_all, nc_c1, nc_c2, nc_c3, nc_c4, nc_c5, self.map_generator)
+        ad_map1, ad_map2 = utils.Utils().map_interpolation(dat_all, ad_c1, ad_c2, ad_c3, ad_c4, ad_c5, self.map_generator)
+        map1 = utils.Utils().range_scale((nc_map1 + ad_map1))
+        map2 = utils.Utils().range_scale((nc_map2 + ad_map2))
+
         with tf.GradientTape() as tape:
             res = self.cls_model({"cls_in": dat_all}, training=True)
             train_loss = loss.CE_loss(lbl, res["cls_out"])
-
-            if config.mode == "Reinforce":
-                nc_c1, nc_c2, nc_c3, nc_c4, nc_c5 = utils.Utils().codemap(c_nc)
-                ad_c1, ad_c2, ad_c3, ad_c4, ad_c5 = utils.Utils().codemap(c_ad)
-                nc_map1, nc_map2 = utils.Utils().map_interpolation(dat_all, nc_c1, nc_c2, nc_c3, nc_c4, nc_c5, self.map_generator)
-                ad_map1, ad_map2 = utils.Utils().map_interpolation(dat_all, ad_c1, ad_c2, ad_c3, ad_c4, ad_c5, self.map_generator)
-                map1 = utils.Utils().range_scale((nc_map1 + ad_map1))
-                map2 = utils.Utils().range_scale((nc_map2 + ad_map2))
-
-                att_loss = loss.annotated_loss(res["m1"], map1)
-                att_loss += loss.annotated_loss(res["m2"], map2)
-                train_loss += config.xga_hyper_param * att_loss / 2
+            att_loss = loss.annotated_loss(res["m1"], map1)
+            att_loss += loss.annotated_loss(res["m2"], map2)
+            train_loss += config.xga_hyper_param * att_loss / 2
 
         grads = tape.gradient(train_loss, train_vars)
         gen_optim.apply_gradients(zip(grads, train_vars))
@@ -123,7 +106,7 @@ class Trainer:
 
     def cycle_consistency(self, pseudo_image, source):
         c1, c2, c3, c4, c5 = utils.Utils().codemap(condition=source)
-        tilde_map = self.gen_model({"gen_in": pseudo_image, "c1": c1, "c2": c2, "c3": c3, "c4": c4, "c5": c5}, training=True)["gen_out"]
+        tilde_map = self.xga_gen_model({"gen_in": pseudo_image, "c1": c1, "c2": c2, "c3": c3, "c4": c4, "c5": c5}, training=True)["gen_out"]
         return pseudo_image + tilde_map
 
     def _GAN_train_one_batch(self, dat_all, gen_optim, disc_optim, target_c, train_vars, train_discri_vars, step):
@@ -132,13 +115,13 @@ class Trainer:
 
         # Discriminator step
         with tf.GradientTape() as tape:
-            cfmap = self.gen_model({"gen_in": dat_all, "c1": t1, "c2": t2, "c3": t3, "c4": t4, "c5": t5}, training=True)["gen_out"]
+            cfmap = self.xga_gen_model({"gen_in": dat_all, "c1": t1, "c2": t2, "c3": t3, "c4": t4, "c5": t5}, training=True)["gen_out"]
             pseudo_image = dat_all + cfmap
             dat_all_like = self.cycle_consistency(pseudo_image, label)
 
-            real = self.discri_model({"discri_in": dat_all}, training=True)["discri_out"]
-            real_like = self.discri_model({"discri_in": dat_all_like}, training=True)["discri_out"]
-            fake = self.discri_model({"discri_in": pseudo_image}, training=True)["discri_out"]
+            real = self.discriminator_model({"discri_in": dat_all}, training=True)["discri_out"]
+            real_like = self.discriminator_model({"discri_in": dat_all_like}, training=True)["discri_out"]
+            fake = self.discriminator_model({"discri_in": pseudo_image}, training=True)["discri_out"]
 
             real_loss = (loss.MSE_loss(tf.ones_like(real), real) + loss.MSE_loss(tf.ones_like(real_like), real_like))/2
             fake_loss = loss.MSE_loss(tf.zeros_like(fake), fake)
@@ -153,12 +136,12 @@ class Trainer:
 
         # Generator step
         with tf.GradientTape() as tape:
-            cfmap = self.gen_model({"gen_in": dat_all, "c1": t1, "c2": t2, "c3": t3, "c4": t4, "c5": t5}, training=True)["gen_out"]
+            cfmap = self.xga_gen_model({"gen_in": dat_all, "c1": t1, "c2": t2, "c3": t3, "c4": t4, "c5": t5}, training=True)["gen_out"]
             pseudo_image = dat_all + cfmap
             dat_all_like = self.cycle_consistency(pseudo_image, label)
 
-            fake = self.discri_model({"discri_in": pseudo_image}, training=True)["discri_out"]
-            fake_like = self.discri_model({"discri_in": dat_all_like}, training=True)["discri_out"]
+            fake = self.discriminator_model({"discri_in": pseudo_image}, training=True)["discri_out"]
+            fake_like = self.discriminator_model({"discri_in": dat_all_like}, training=True)["discri_out"]
 
             pred = self.cls_model({"cls_in": pseudo_image}, training=False)["cls_out"]
 
@@ -190,20 +173,18 @@ class Trainer:
                 tf.summary.scalar("generator_tv_loss", tv, step=step)
 
     def _valid_logger(self, dat_all, lbl, epoch, cv, c_nc, c_ad):
+        nc_c1, nc_c2, nc_c3, nc_c4, nc_c5 = utils.Utils().codemap(c_nc)
+        ad_c1, ad_c2, ad_c3, ad_c4, ad_c5 = utils.Utils().codemap(c_ad)
+        nc_map1, nc_map2 = utils.Utils().map_interpolation(dat_all, nc_c1, nc_c2, nc_c3, nc_c4, nc_c5, self.map_generator)
+        ad_map1, ad_map2 = utils.Utils().map_interpolation(dat_all, ad_c1, ad_c2, ad_c3, ad_c4, ad_c5, self.map_generator)
+        map1 = utils.Utils().range_scale((nc_map1 + ad_map1))
+        map2 = utils.Utils().range_scale((nc_map2 + ad_map2))
+
         res = self.cls_model({"cls_in": dat_all}, training=False)
         valid_loss, valid_acc = loss.CE_loss(lbl, res["cls_out"]), test.ACC(lbl, res["cls_out"])
-
-        if config.mode == "Reinforce":
-            nc_c1, nc_c2, nc_c3, nc_c4, nc_c5 = utils.Utils().codemap(c_nc)
-            ad_c1, ad_c2, ad_c3, ad_c4, ad_c5 = utils.Utils().codemap(c_ad)
-            nc_map1, nc_map2 = utils.Utils().map_interpolation(dat_all, nc_c1, nc_c2, nc_c3, nc_c4, nc_c5, self.map_generator)
-            ad_map1, ad_map2 = utils.Utils().map_interpolation(dat_all, ad_c1, ad_c2, ad_c3, ad_c4, ad_c5, self.map_generator)
-            map1 = utils.Utils().range_scale((nc_map1 + ad_map1))
-            map2 = utils.Utils().range_scale((nc_map2 + ad_map2))
-
-            att_loss = loss.annotated_loss(res["m1"], map1)
-            att_loss += loss.annotated_loss(res["m2"], map2)
-            valid_loss += config.xga_hyper_param * att_loss / 2
+        att_loss = loss.annotated_loss(res["m1"], map1)
+        att_loss += loss.annotated_loss(res["m2"], map2)
+        valid_loss += config.xga_hyper_param * att_loss / 2
 
         self.valid_loss += valid_loss
         self.valid_acc += valid_acc
@@ -227,12 +208,12 @@ class Trainer:
         label = self.cls_model({"cls_in": dat_all}, training=False)["cls_out"]
         t1, t2, t3, t4, t5 = utils.Utils().codemap(condition=target_c)
 
-        cfmap = self.gen_model({"gen_in": dat_all, "c1": t1, "c2": t2, "c3": t3, "c4": t4, "c5": t5}, training=True)["gen_out"]
+        cfmap = self.xga_gen_model({"gen_in": dat_all, "c1": t1, "c2": t2, "c3": t3, "c4": t4, "c5": t5}, training=True)["gen_out"]
         pseudo_image = dat_all + cfmap
         dat_all_like = self.cycle_consistency(pseudo_image, label)
 
-        fake = self.discri_model({"discri_in": pseudo_image}, training=True)["discri_out"]
-        fake_like = self.discri_model({"discri_in": dat_all_like}, training=True)["discri_out"]
+        fake = self.discriminator_model({"discri_in": pseudo_image}, training=True)["discri_out"]
+        fake_like = self.discriminator_model({"discri_in": dat_all_like}, training=True)["discri_out"]
 
         pred = self.cls_model({"cls_in": pseudo_image}, training=False)["cls_out"]
 
@@ -264,7 +245,7 @@ class Trainer:
                 self.valid_loss, self.count = 0, 0
                 self.valid_save = False
 
-    def cls_train(self):
+    def iter_cls_train(self):
         dat, lbl = utils.Utils().load_adni_data()
 
         for cv in range(0, self.fold):
@@ -280,21 +261,16 @@ class Trainer:
 
             for cur_epoch in tqdm.trange(config.epoch, desc="3class_resnet18_%s.py" % self.file_name):
                 self.train_all_idx = np.random.permutation(self.train_all_idx)
-
-                if config.mode == "Reinforce":
-                    target_nc, target_ad = utils.Utils().code_creator(len(self.train_all_idx))
+                target_nc, target_ad = utils.Utils().code_creator(len(self.train_all_idx))
 
                 # training
                 for cur_step in tqdm.trange(0, len(self.train_all_idx), config.batch_size, desc="%dfold_%depoch_%s" % (cv + 1, cur_epoch, self.file_name)):
                     cur_idx = self.train_all_idx[cur_step:cur_step + config.batch_size]
                     cur_dat, cur_lbl = utils.Utils().seperate_data(cur_idx, dat, lbl, CENTER=False)
 
-                    if config.mode == "Reinforce":
-                        condition_nc, condition_ad = target_nc[cur_step:cur_step + config.batch_size], target_ad[cur_step:cur_step + config.batch_size]
-                        condition_nc, condition_ad = condition_nc[:len(cur_dat)], condition_ad[:len(cur_dat)]
-                        self._train_one_batch(dat_all=cur_dat, lbl=cur_lbl, gen_optim=optim, train_vars=self.train_vars, step=global_step, cv=cv, c_nc=condition_nc, c_ad=condition_ad)
-                    else:
-                        self._train_one_batch(dat_all=cur_dat, lbl=cur_lbl, gen_optim=optim, train_vars=self.train_vars, step=global_step, cv=cv, c_nc=None, c_ad=None)
+                    condition_nc, condition_ad = target_nc[cur_step:cur_step + config.batch_size], target_ad[cur_step:cur_step + config.batch_size]
+                    condition_nc, condition_ad = condition_nc[:len(cur_dat)], condition_ad[:len(cur_dat)]
+                    self._train_one_batch(dat_all=cur_dat, lbl=cur_lbl, gen_optim=optim, train_vars=self.train_vars, step=global_step, cv=cv, c_nc=condition_nc, c_ad=condition_ad)
                     global_step += 1
 
                 # validation
@@ -302,17 +278,14 @@ class Trainer:
                     val_idx = self.valid_all_idx[val_step:val_step + config.batch_size]
                     val_dat, val_lbl = utils.Utils().seperate_data(val_idx, dat, lbl, CENTER=True)
 
+                    condition_nc, condition_ad = target_nc[cur_step:cur_step + config.batch_size], target_ad[cur_step:cur_step + config.batch_size]
+                    condition_nc, condition_ad = condition_nc[:len(cur_dat)], condition_ad[:len(cur_dat)]
+
                     if val_step + config.batch_size >= len(self.valid_all_idx): self.valid_save = True
-                    if config.mode == "Reinforce":
-                        condition_nc, condition_ad = target_nc[cur_step:cur_step + config.batch_size], target_ad[cur_step:cur_step + config.batch_size]
-                        condition_nc, condition_ad = condition_nc[:len(cur_dat)], condition_ad[:len(cur_dat)]
-                        self._valid_logger(dat_all=val_dat, lbl=val_lbl, epoch=cur_epoch, cv=cv, c_nc=condition_nc, c_ad=condition_ad)
-                    else:
-                        self._valid_logger(dat_all=val_dat, lbl=val_lbl, epoch=cur_epoch, cv=cv, c_nc=None, c_ad=None)
+                    self._valid_logger(dat_all=val_dat, lbl=val_lbl, epoch=cur_epoch, cv=cv, c_nc=condition_nc, c_ad=condition_ad)
 
                 if self.model_select == True:
-                    if config.mode == "Learn": self.cls_model.save(os.path.join(self.path + '/%dfold_cls_model' % (cv + 1)))
-                    else: self.cls_model.save(os.path.join(self.path + '/%dfold_xga_cls_model' % (cv + 1)))
+                    self.cls_model.save(os.path.join(self.path + '/%dfold_iter_xga_cls_model' % (cv + 1)))
                     self.model_select = False
 
                 # Test
@@ -332,7 +305,7 @@ class Trainer:
                     tf.summary.scalar("%dfold_test_mAUC" % (cv + 1), mAUC, step=cur_epoch)
                     tf.summary.scalar("%dfold_test_ACC" % (cv + 1), ACC, step=cur_epoch)
 
-    def gan_train(self):
+    def iter_gan_train(self):
         dat, lbl = utils.Utils().load_adni_data()
 
         for cv in range(0, self.fold):
@@ -375,16 +348,16 @@ class Trainer:
                     self._GAN_valid_logger(dat_all=val_dat, target_c=target_idx, epoch=cur_epoch)
 
                 if self.model_select == True:
-                    self.gen_model.save(os.path.join(self.path + '/%dfold_gen_model' % (cv + 1)))
+                    self.xga_gen_model.save(os.path.join(self.path + '/%dfold_iter_xga_gen_model' % (cv + 1)))
                     self.model_select = False
 
                 # Test
-                a1, a2, a3, a4, a5, a6, n1, n2, n3, n4, n5, n6 = test.ncc_evaluation(self.cls_model, self.gen_model)
+                a1, a2, a3, a4, a5, a6, n1, n2, n3, n4, n5, n6 = test.ncc_evaluation(self.cls_model, self.xga_gen_model)
                 f = open(self.path + "/%fold_all_ncc_result.txt" % (cv+1), "a")
                 f.write("Epoch:%03d -> acc1:%.3f | acc2: %.3f | acc3:%.3f | acc4: %.3f | acc5:%.3f | acc6: %.3f |\n" % (cur_epoch, a1, a2, a3, a4, a5, a6))
                 f.write("Epoch:%03d -> ncc1:%.3f | ncc2: %.3f | ncc3:%.3f | ncc4: %.3f | ncc5:%.3f | ncc6: %.3f |\n\n" % (cur_epoch, n1, n2, n3, n4, n5, n6))
                 f.close()
 
 Tr = Trainer()
-if config.mode == "Learn" or config.mode == "Reinforce": Tr.cls_train()
-elif config.mode == "Explain": Tr.gan_train()
+if config.mode == "Iter_reinforcement": Tr.iter_cls_train()
+elif config.mode == "Iter_Explanation": Tr.iter_gan_train()

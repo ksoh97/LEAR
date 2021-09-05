@@ -5,11 +5,11 @@ import GPUtil
 GPU = -1
 if GPU == -1: devices = "%d" % GPUtil.getFirstAvailable(order="memory")[0]
 else: devices = "%d" % GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = devices
 
 # Mode description
 mode_dict = {"Learn": 0, "Explain": 1, "Reinforce": 2, "Iter_Explanation": 3, "Iter_reinforcement": 4}
-mode = "Reinforce"
+mode = "Learn"
 
 # TODO: Make sure you define your data load/save path here!!
 # data_path = "/..."
@@ -35,16 +35,16 @@ if mode_dict[mode] == 0 or mode_dict[mode] == 2 or mode_dict[mode] == 4:
 
     # Weight constants
     if mode_dict[mode] == 4:
+        xga_gen_weight_path = save_path + "/xga_gen_model/variables/variables"
         xga_cls_weight_path = save_path + "/xga_cls_model/variables/variables"
-        xga_enc_weight_path = save_path + "/xga_enc_model/variables/variables"
 
     elif mode_dict[mode] == 2:
-        cmg_weight_path = save_path + "/cmg_model/variables/variables"
+        gen_weight_path = save_path + "/gen_model/variables/variables"
         cls_weight_pkl_path = save_path + "cls_model_weights.pkl"
 
 elif mode_dict[mode] == 1 or mode_dict[mode] == 3:
     epoch = 100
-    batch_size = 4
+    batch_size = 3
     lr_g, lr_d, lr_decay = 0.01, 0.01, 1
 
     # Weight constants
@@ -54,4 +54,6 @@ elif mode_dict[mode] == 1 or mode_dict[mode] == 3:
 
     if mode_dict[mode] == 1:
         cls_weight_path = "/cls_model/variables/variables"
-    # else: xga_cmg_weight_path = save_path + "/xga_cmg_model/variables/variables"
+    else:
+        xga_cls_weight_path = save_path + "/xga_cls_model/variables/variables"
+        gen_weight_path = save_path + "/gen_model/variables/variables"
