@@ -11,14 +11,9 @@ os.environ["CUDA_VISIBLE_DEVICES"] = devices
 mode_dict = {"Learn": 0, "Explain": 1, "Reinforce": 2, "Iter_Explanation": 3, "Iter_reinforcement": 4}
 mode = "Learn"
 
-# TODO: Make sure you define your data load/save path here!!
 # data_path = "/..."
 # longitudinal_data_path = "/..."
 # save_path = "/..."
-
-data_path = "/DataRead/ksoh/js_ws_data/"
-longitudinal_data_path = "/DataCommon/ksoh/longitudinal/3class"
-save_path = "/DataCommon2/ksoh/classification_performance/3CLASS/"
 
 file_name = mode
 save_path = save_path + "/%s" % mode
