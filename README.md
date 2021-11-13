@@ -9,12 +9,11 @@ Tensorflow implementation of [Learn-Explain-Reinforce: Counterfactual Reasoning 
 
 ![Group 2896 (3)](https://user-images.githubusercontent.com/57162425/141603646-f714edb2-cc01-4b22-80df-056da791947c.png)
 
-![Group 2897](https://user-images.githubusercontent.com/57162425/141603560-9f0961e7-bcd6-41c7-9604-7c6b8142ef36.png)
+![Group 2897 (1)](https://user-images.githubusercontent.com/57162425/141603979-e9f58b9b-6424-4392-8158-1dbb2353b5d3.png)
 
 ## Results
 ###  Example of counterfactual map conditioned on interpolated target labels
 ![Group 2584](https://user-images.githubusercontent.com/57162425/141603337-4951d4d6-8237-4fc1-80dd-8c87f7dd9d18.png)
-
 ### Visual explanation comparison between XAI methods
 ![Group 2777](https://user-images.githubusercontent.com/57162425/141603345-abdf11e0-f7bf-4ecf-979e-f1604cd27c2c.jpg)
 
