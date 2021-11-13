@@ -1,18 +1,26 @@
 # Learn-Explain-Reinforce
 Tensorflow implementation of [Learn-Explain-Reinforce: Counterfactual Reasoning and Its Guidance to Reinforce an Alzheimer's Disease Diagnosis Model](https://arxiv.org/abs/2108.09451).
 
+
 ## Overall framework
-- asdf
-![Group 2835](https://user-images.githubusercontent.com/57162425/141603342-73bee29c-fa07-4c83-a919-bc69975a8414.jpg)
+- We propose a novel learn-explain-reinforce framework that integrates the following tasks: (1) training a diagnostic model, (2) explaining a diagnostic model's output, and (3) reinforcing the diagnostic model based on the explanation systematically.
+- To the best of our knowledge, this work is the first that exploits an explanation output to improve the generalization of a diagnostic model reciprocally.
+- In regard to explanation, we propose a GAN-based method to produce multi-way counterfactual maps that can provide a more precise explanation, accounting for severity and/or progression of AD.
+
+![Group 2896 (3)](https://user-images.githubusercontent.com/57162425/141603646-f714edb2-cc01-4b22-80df-056da791947c.png)
 
 ![Group 2897](https://user-images.githubusercontent.com/57162425/141603560-9f0961e7-bcd6-41c7-9604-7c6b8142ef36.png)
 
 ## Results
-![Group 2777](https://user-images.githubusercontent.com/57162425/141603345-abdf11e0-f7bf-4ecf-979e-f1604cd27c2c.jpg)
-
+###  Example of counterfactual map conditioned on interpolated target labels
 ![Group 2584](https://user-images.githubusercontent.com/57162425/141603337-4951d4d6-8237-4fc1-80dd-8c87f7dd9d18.png)
 
+### Visual explanation comparison between XAI methods
+![Group 2777](https://user-images.githubusercontent.com/57162425/141603345-abdf11e0-f7bf-4ecf-979e-f1604cd27c2c.jpg)
+
+### Iterative explanation-reinforcement learning
 ![Group 2896](https://user-images.githubusercontent.com/57162425/141603346-ec6afc03-9aa7-4f73-815a-d79969fd0f09.png)
+
 
 ## Requirements
 tensorflow (2.2.0)\
