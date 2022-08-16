@@ -61,7 +61,6 @@ Mode:\
 >- Change the mode to 3 or 4 on Config.py
   >- `LEAR_iterative_training.py --mode=3 and --mode=4`
 
-
 ## Config.py of each dataset with saved weight path
 data_path = Raw dataset path\
 save_path = Storage path to save results such as tensorboard event files, model weights, etc.\
@@ -71,3 +70,19 @@ gen_weight_path = Pre-trained counterfactual map generator weight path trained i
 xga_cls_weight_path = Pre-trained XGA-injected diagnostic model weight path trained in mode#2 or mode#4 setup\
 xga_enc_weight_path = Pre-trained XGA-injected encoder weight path trained in mode#2 or mode#4 setup\
 xga_gen_weight_path = Pre-trained XGA-injected counterfactual map generator weight path trained in mode#3 setup
+
+## Citation
+If you find this work useful for your research, please cite our [journal publication](https://ieeexplore.ieee.org/document/9854196):
+
+```
+@ARTICLE{9854196,
+  author={Oh, Kwanseok and Yoon, Jee Seok and Suk, Heung-Il},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, 
+  title={Learn-Explain-Reinforce: Counterfactual Reasoning and Its Guidance to Reinforce an Alzheimer&#x0027;s Disease Diagnosis Model}, 
+  year={2022},
+  publisher={IEEE},
+  volume={},
+  number={},
+  pages={1-15},
+  doi={10.1109/TPAMI.2022.3197845}}
+```
