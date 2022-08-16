@@ -78,7 +78,7 @@ If you find this work useful for your research, please cite our [journal publica
 @ARTICLE{9854196,
   author={Oh, Kwanseok and Yoon, Jee Seok and Suk, Heung-Il},
   journal={IEEE Transactions on Pattern Analysis and Machine Intelligence}, 
-  title={Learn-Explain-Reinforce: Counterfactual Reasoning and Its Guidance to Reinforce an Alzheimer&#x0027;s Disease Diagnosis Model}, 
+  title={Learn-Explain-Reinforce: Counterfactual Reasoning and Its Guidance to Reinforce an Alzheimer's Disease Diagnosis Model}, 
   year={2022},
   publisher={IEEE},
   volume={},
